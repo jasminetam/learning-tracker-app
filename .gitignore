@@ -1,8 +1,29 @@
-*.js
-!jest.config.js
-*.d.ts
-node_modules
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
 
-# CDK asset staging directory
-.cdk.staging
-cdk.out
+# CDK
+cdk.out/
+cdk.context.json
+
+# AWS
+.aws/
+*.pem
+*.key
+
+# Environment files
+.env
+.env.*
+*.local
+
+# macOS
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# IDE files
+.vscode/
+.idea/
