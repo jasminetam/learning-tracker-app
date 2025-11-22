@@ -52,26 +52,21 @@ ai_coach/ # FastAPI / LLM logic (future)
 
 ## Architecture Diagram
 
-```mermaid
-flowchart TD
-  RN[React Native App] -->|HTTPS| APIGW[API Gateway REST API]
+## Architecture Diagram (List)
 
-  APIGW --> R1[Resources Lambda]
-  APIGW --> S1[Stats Lambda]
-  APIGW --> A1[AI Coach Lambda (stub)]
+1. **React Native app** sends HTTPS requests to:
+2. **API Gateway (REST)** which routes to:
+   - **Resources Lambda**
+     - reads/writes **DynamoDB**
+     - uploads/downloads files from **S3**
+   - **Stats Lambda**
+     - reads **DynamoDB**
+   - **AI Coach Lambda (stub)**
+     - reads **DynamoDB**
+     - (future) forwards to **Python AI Coach service**
+       - (future) calls **Bedrock / OpenAI**
 
-  R1 --> DDB[(DynamoDB: learning-tracker-resources)]
-  S1 --> DDB
-  A1 --> DDB
-
-  R1 --> S3[(S3: uploads bucket)]
-
-  A1 -.future.-> PY[Python AI Coach Service]
-  PY -.future.-> LLM[Bedrock / OpenAI]
-
-```
-
-# API Endpoints
+## API Endpoints
 
 **Base URL** is printed after deploy as **`ApiUrl`**.
 
