@@ -12,6 +12,10 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
+import * as eventbridge from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 
 export class InfraStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -101,5 +105,51 @@ export class InfraStack extends Stack {
     new CfnOutput(this, "UploadsBucketName", {
       value: uploadsBucket.bucketName,
     });
+    // --- EventBridge Bus (optional custom bus; default bus also ok) ---
+    const bus = new eventbridge.EventBus(this, "LearningTrackerBus", {
+      eventBusName: "learning-tracker-bus",
+    });
+
+    // --- SQS queue for stats recompute ---
+    const statsQueue = new sqs.Queue(this, "StatsQueue", {
+      queueName: "learning-tracker-stats-queue",
+      visibilityTimeout: Duration.seconds(60),
+      retentionPeriod: Duration.days(4),
+    });
+
+    // --- Worker Lambda ---
+    const statsWorkerFn = mkLambda(
+      "StatsWorkerFn",
+      "lambdas/stats-worker/handler.ts"
+    );
+
+    // Permissions for worker
+    resourcesTable.grantReadData(statsWorkerFn);
+    resourcesTable.grantReadWriteData(statsWorkerFn);
+    // (worker writes aggregated stats back into SAME table)
+    statsQueue.grantConsumeMessages(statsWorkerFn);
+    bus.grantPutEventsTo(resourcesFn); // allow resourcesFn to publish
+
+    // Wire SQS → worker
+    statsWorkerFn.addEventSource(
+      new lambdaEventSources.SqsEventSource(statsQueue, {
+        batchSize: 5,
+        maxBatchingWindow: Duration.seconds(5),
+      })
+    );
+
+    // EventBridge rule: ResourceUpdated → SQS
+    new eventbridge.Rule(this, "ResourceUpdatedRule", {
+      eventBus: bus,
+      eventPattern: {
+        source: ["learning-tracker.resources"],
+        detailType: ["ResourceUpdated"],
+      },
+      targets: [new targets.SqsQueue(statsQueue)],
+    });
+
+    // Make bus name available to resourcesFn
+    resourcesFn.addEnvironment("EVENT_BUS_NAME", bus.eventBusName);
+    statsWorkerFn.addEnvironment("EVENT_BUS_NAME", bus.eventBusName);
   }
 }
