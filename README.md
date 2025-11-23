@@ -8,6 +8,7 @@ This repo demonstrates:
 - Serverless backend using **API Gateway + Lambda**
 - **DynamoDB** for data storage
 - **S3** for file uploads
+- **EventBridge + SQS + Worker Lambda** for asynchronous stats computation
 - A stubbed **AI Coach service** (planned Python/LLM integration)
 - A React Native app folder ready to consume the API
 
@@ -22,6 +23,7 @@ This repo demonstrates:
 - **API Gateway (REST API)**
 - **DynamoDB (PAY_PER_REQUEST)**
 - **S3 (private bucket)**
+- **EventBridge + SQS + Worker Lambda**
 
 ### Mobile (Frontend)
 
@@ -49,8 +51,6 @@ stats/
 ai-coach/
 python/ # (planned) Python AI services
 ai_coach/ # FastAPI / LLM logic (future)
-
-## Architecture Diagram
 
 ## Architecture Diagram (List)
 
@@ -119,6 +119,7 @@ S3 bucket name
 
 Replace API_URL with the CDK output:
 
+```bash
 API_URL="https://xxxx.execute-api.eu-west-2.amazonaws.com/dev"
 
 curl "$API_URL/resources"
@@ -131,6 +132,7 @@ curl "$API_URL/stats"
 curl -X POST "$API_URL/ai-coach" \
  -H "Content-Type: application/json" \
  -d '{"prompt":"hi"}'
+```
 
 Expected responses are JSON hello-world stubs.
 
