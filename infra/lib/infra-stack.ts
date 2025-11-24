@@ -39,6 +39,11 @@ export class InfraStack extends Stack {
       autoDeleteObjects: true, // dev-friendly
     });
 
+    // --- EventBridge Bus ---
+    const bus = new eventbridge.EventBus(this, "LearningTrackerBus", {
+      eventBusName: "learning-tracker-bus",
+    });
+
     // Helper to create Nodejs lambdas
     const mkLambda = (name: string, entryRelPath: string) =>
       new NodejsFunction(this, name, {
@@ -56,6 +61,8 @@ export class InfraStack extends Stack {
           RESOURCES_TABLE_NAME: resourcesTable.tableName,
           UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
+          // expose bus name in every lambda by default
+          EVENT_BUS_NAME: bus.eventBusName,
         },
       });
 
@@ -64,9 +71,12 @@ export class InfraStack extends Stack {
     const statsFn = mkLambda("StatsFn", "lambdas/stats/handler.ts");
     const aiCoachFn = mkLambda("AiCoachFn", "lambdas/ai-coach/handler.ts");
 
+    // DEV auth flag (lets backend read dev userId from Bearer token)
+    resourcesFn.addEnvironment("DEV_AUTH", "true");
+
     // Permissions
     resourcesTable.grantReadWriteData(resourcesFn);
-    resourcesTable.grantReadData(statsFn); // stats usually only reads
+    resourcesTable.grantReadData(statsFn);
     resourcesTable.grantReadData(aiCoachFn);
 
     uploadsBucket.grantReadWrite(resourcesFn);
@@ -89,6 +99,15 @@ export class InfraStack extends Stack {
     resources.addMethod("GET", new apigw.LambdaIntegration(resourcesFn));
     resources.addMethod("POST", new apigw.LambdaIntegration(resourcesFn));
 
+    // /resources/{id}
+    const resourceById = resources.addResource("{id}");
+    resourceById.addMethod("GET", new apigw.LambdaIntegration(resourcesFn));
+    resourceById.addMethod("DELETE", new apigw.LambdaIntegration(resourcesFn));
+
+    // /resources/{id}/progress
+    const progress = resourceById.addResource("progress");
+    progress.addMethod("PATCH", new apigw.LambdaIntegration(resourcesFn));
+
     // /stats
     const stats = api.root.addResource("stats");
     stats.addMethod("GET", new apigw.LambdaIntegration(statsFn));
@@ -96,19 +115,6 @@ export class InfraStack extends Stack {
     // /ai-coach
     const aiCoach = api.root.addResource("ai-coach");
     aiCoach.addMethod("POST", new apigw.LambdaIntegration(aiCoachFn));
-
-    // Outputs
-    new CfnOutput(this, "ApiUrl", { value: api.url });
-    new CfnOutput(this, "ResourcesTableName", {
-      value: resourcesTable.tableName,
-    });
-    new CfnOutput(this, "UploadsBucketName", {
-      value: uploadsBucket.bucketName,
-    });
-    // --- EventBridge Bus (optional custom bus; default bus also ok) ---
-    const bus = new eventbridge.EventBus(this, "LearningTrackerBus", {
-      eventBusName: "learning-tracker-bus",
-    });
 
     // --- SQS queue for stats recompute ---
     const statsQueue = new sqs.Queue(this, "StatsQueue", {
@@ -123,12 +129,16 @@ export class InfraStack extends Stack {
       "lambdas/stats-worker/handler.ts"
     );
 
+    // DEV auth flag for worker
+    statsWorkerFn.addEnvironment("DEV_AUTH", "true");
+
     // Permissions for worker
     resourcesTable.grantReadData(statsWorkerFn);
     resourcesTable.grantReadWriteData(statsWorkerFn);
-    // (worker writes aggregated stats back into SAME table)
     statsQueue.grantConsumeMessages(statsWorkerFn);
-    bus.grantPutEventsTo(resourcesFn); // allow resourcesFn to publish
+
+    // Allow resources lambda to publish events
+    bus.grantPutEventsTo(resourcesFn);
 
     // Wire SQS → worker
     statsWorkerFn.addEventSource(
@@ -148,8 +158,19 @@ export class InfraStack extends Stack {
       targets: [new targets.SqsQueue(statsQueue)],
     });
 
-    // Make bus name available to resourcesFn
-    resourcesFn.addEnvironment("EVENT_BUS_NAME", bus.eventBusName);
-    statsWorkerFn.addEnvironment("EVENT_BUS_NAME", bus.eventBusName);
+    // Outputs
+    new CfnOutput(this, "ApiUrl", { value: api.url });
+    new CfnOutput(this, "ResourcesTableName", {
+      value: resourcesTable.tableName,
+    });
+    new CfnOutput(this, "UploadsBucketName", {
+      value: uploadsBucket.bucketName,
+    });
+    new CfnOutput(this, "EventBusName", {
+      value: bus.eventBusName,
+    });
+    new CfnOutput(this, "StatsQueueUrl", {
+      value: statsQueue.queueUrl,
+    });
   }
 }

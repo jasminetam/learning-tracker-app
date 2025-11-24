@@ -66,18 +66,55 @@ ai_coach/ # FastAPI / LLM logic (future)
      - (future) forwards to **Python AI Coach service**
        - (future) calls **Bedrock / OpenAI**
 
+## Asynchronous Stats Pipeline
+
+1. **Resources Lambda**
+
+   - Writes/updates a resource in DynamoDB.
+   - Publishes a `ResourceUpdated` event.
+
+2. **EventBridge**
+
+   - Receives the event.
+   - Filters matching events:
+     - `source = "learning-tracker.resources"`
+     - `detail-type = "ResourceUpdated"`
+
+3. **SQS (StatsQueue)**
+
+   - EventBridge delivers events into SQS.
+   - Buffers spikes and retries automatically.
+
+4. **Stats Worker Lambda**
+
+   - Triggered by SQS.
+   - Recomputes weekly aggregates:
+     - total resources
+     - active vs completed
+     - hours spent this week
+   - Stores stats in DynamoDB:
+
+     `PK = USER#<userId>`  
+     `SK = STATS#WEEKLY#<yyyy-WW>`
+
+5. **User experience**
+   - Stats update asynchronously without blocking the main API calls.
+
 ## API Endpoints
 
 **Base URL** is printed after deploy as **`ApiUrl`**.
 
-## Endpoints
+Base URL is printed after deploy as `ApiUrl`.
 
-| Method | Route        | Lambda        | Purpose                         |
-| ------ | ------------ | ------------- | ------------------------------- |
-| `GET`  | `/resources` | `resourcesFn` | Hello / list resources (stub)   |
-| `POST` | `/resources` | `resourcesFn` | Create resource (stub)          |
-| `GET`  | `/stats`     | `statsFn`     | Basic stats / health check      |
-| `POST` | `/ai-coach`  | `aiCoachFn`   | AI Coach stub; Python/LLM later |
+| Method | Route                      | Purpose                             |
+| ------ | -------------------------- | ----------------------------------- |
+| GET    | `/resources`               | List resources for a user           |
+| POST   | `/resources`               | Create a new resource               |
+| GET    | `/resources/{id}`          | Get one resource                    |
+| PATCH  | `/resources/{id}/progress` | Append progress + increment minutes |
+| DELETE | `/resources/{id}`          | Delete resource + its progress logs |
+| GET    | `/stats`                   | Basic health/stats stub             |
+| POST   | `/ai-coach`                | AI coach stub (Python later)        |
 
 ---
 
@@ -136,6 +173,40 @@ curl -X POST "$API_URL/ai-coach" \
 
 Expected responses are JSON hello-world stubs.
 
+---
+
+````md
+## React Native MVP (Expo)
+
+The mobile app (in `mobile/`) supports:
+
+- Login (dev token)
+- Resource list
+- Add resource
+- Update progress modal
+
+### Run mobile app
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
+````
+
+```md
+## Dev Auth (Temporary)
+
+Backend does not enforce real authentication yet.
+
+For MVP:
+
+- The mobile app stores a dev token: `dev-token:<userId>`
+- Requests send: `Authorization: Bearer dev-token:<userId>`
+- Lambdas read userId from the header when `DEV_AUTH=true`
+
+This will later be replaced by Cognito JWTs without changing the API client.
+
 ## Future Work (Python AI Coach)
 
 Planned expansion:
@@ -149,3 +220,4 @@ Route /ai-coach to Python service
 Integrate LLM reasoning (Bedrock/OpenAI)
 
 Add user-specific recs + progress coaching
+```

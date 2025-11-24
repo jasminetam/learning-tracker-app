@@ -1,29 +1,46 @@
-# Node
+# -----------------------
+# Node / JS
+# -----------------------
 node_modules/
-npm-debug.log
-yarn-error.log
-
-# CDK
-cdk.out/
-cdk.context.json
-
-# AWS
-.aws/
-*.pem
-*.key
-
-# Environment files
-.env
-.env.*
-*.local
-
-# macOS
-.DS_Store
-
-# Logs
-logs/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+yarn-error.log*
 *.log
 
-# IDE files
+# -----------------------
+# Expo / React Native
+# -----------------------
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+mobile/web-build/
+mobile/.env
+mobile/.env.*
+mobile/*.local
+mobile/ios/
+mobile/android/
+
+# -----------------------
+# CDK / AWS
+# -----------------------
+infra/node_modules/
+infra/cdk.out/
+infra/cdk.context.json
+infra/*.local
+
+# -----------------------
+# Environment / Secrets
+# -----------------------
+.env
+.env.*
+*.pem
+*.key
+.aws/
+
+# -----------------------
+# OS / IDE
+# -----------------------
+.DS_Store
 .vscode/
 .idea/
