@@ -1,4 +1,4 @@
-# Learning Tracker App (AWS CDK + Lambda + React Native + Python AI Coach)
+# Learning Tracker App (AWS CDK + Lambda + React Native + Node.js AI Coach)
 
 A minimal, full-stack project showing how learning progress tracker can be built in cloud infrastructure and React Native UI.
 
@@ -9,7 +9,7 @@ This repo demonstrates:
 - **DynamoDB** for data storage
 - **S3** for file uploads
 - **EventBridge + SQS + Worker Lambda** for asynchronous stats computation
-- A stubbed **AI Coach service** (planned Python/LLM integration)
+- A stubbed **AI Coach service**
 - A React Native app folder ready to consume the API
 
 ---
@@ -29,28 +29,27 @@ This repo demonstrates:
 
 - **React Native / Expo** (scaffolded in `mobile/`)
 
-### Python (AI / Future Services)
+### AI Coach
 
-- Planned **AI Coach** service in Python, intended to:
-  - run prompt reasoning / recommendations
-  - call LLM providers (Bedrock / OpenAI)
-  - potentially expose a FastAPI microservice later
-- Current AI endpoint is a Lambda stub (`lambdas/ai-coach/handler.ts`)
-- Python implementation will live in `python/ai_coach/` (to be added)
+- The AI suggestions endpoint is implemented as a **Node.js Lambda**:
+  - `POST /ai/suggest-next`
+  - Calls **Amazon Bedrock (Titan Text Lite)** for recommendations
+  - Stores suggestions back into DynamoDB under:
+    - `PK=USER#<id>`
+    - `SK=SUGGESTIONS#<timestamp>`
+- This keeps the backend fully serverless and easy to deploy via CDK.
 
 ---
 
 ## Project Structure
 
 learning-tracker-app/
-mobile/ # React Native app (later wiring)
+mobile/ # React Native app
 infra/ # AWS CDK project
 lambdas/ # Lambda source code
 resources/
 stats/
-ai-coach/
-python/ # (planned) Python AI services
-ai_coach/ # FastAPI / LLM logic (future)
+ai_coach/ # LLM logic
 
 ## Architecture Diagram (List)
 
@@ -61,10 +60,10 @@ ai_coach/ # FastAPI / LLM logic (future)
      - uploads/downloads files from **S3**
    - **Stats Lambda**
      - reads **DynamoDB**
-   - **AI Coach Lambda (stub)**
+   - **AI Coach Lambda**
      - reads **DynamoDB**
-     - (future) forwards to **Python AI Coach service**
-       - (future) calls **Bedrock / OpenAI**
+     - forwards to **AI Coach service**
+       - calls **Bedrock / OpenAI**
 
 ## Asynchronous Stats Pipeline
 
@@ -102,19 +101,15 @@ ai_coach/ # FastAPI / LLM logic (future)
 
 ## API Endpoints
 
-**Base URL** is printed after deploy as **`ApiUrl`**.
-
-Base URL is printed after deploy as `ApiUrl`.
-
-| Method | Route                      | Purpose                             |
-| ------ | -------------------------- | ----------------------------------- |
-| GET    | `/resources`               | List resources for a user           |
-| POST   | `/resources`               | Create a new resource               |
-| GET    | `/resources/{id}`          | Get one resource                    |
-| PATCH  | `/resources/{id}/progress` | Append progress + increment minutes |
-| DELETE | `/resources/{id}`          | Delete resource + its progress logs |
-| GET    | `/stats`                   | Basic health/stats stub             |
-| POST   | `/ai-coach`                | AI coach stub (Python later)        |
+| Method | Route                      | Purpose                          |
+| ------ | -------------------------- | -------------------------------- |
+| GET    | `/resources`               | List resources                   |
+| POST   | `/resources`               | Create resource                  |
+| GET    | `/resources/{id}`          | Get one resource                 |
+| PATCH  | `/resources/{id}/progress` | Add progress + increment minutes |
+| DELETE | `/resources/{id}`          | Delete resource + progress logs  |
+| GET    | `/stats`                   | Health/stats stub                |
+| POST   | `/ai/suggest-next`         | Get next 3 AI suggestions        |
 
 ---
 
@@ -194,7 +189,7 @@ npx expo start
 ```
 ````
 
-```md
+````md
 ## Dev Auth (Temporary)
 
 Backend does not enforce real authentication yet.
@@ -207,17 +202,23 @@ For MVP:
 
 This will later be replaced by Cognito JWTs without changing the API client.
 
-## Future Work (Python AI Coach)
+## Costs / Free Tier Notes
 
-Planned expansion:
+This project is designed to stay within AWS Free Tier for normal development:
 
-Add python/ai_coach/ FastAPI service
+- **Lambda**: 1M requests/month free
+- **API Gateway**: 1M calls/month free
+- **DynamoDB (PAY_PER_REQUEST)**: generous free tier for dev workloads
+- **S3**: 5GB free storage
 
-Deploy via Lambda (container) or ECS Fargate
+**Bedrock is NOT free tier.**
+The AI endpoint uses **Amazon Titan Text Lite** for lowest cost.
+Keep prompts short during demos to minimize spend.
 
-Route /ai-coach to Python service
+Always destroy stacks when finished:
 
-Integrate LLM reasoning (Bedrock/OpenAI)
-
-Add user-specific recs + progress coaching
+```bash
+cd infra
+cdk destroy
 ```
+````

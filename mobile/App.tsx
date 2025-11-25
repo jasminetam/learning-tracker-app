@@ -5,11 +5,13 @@ import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import LoginScreen from "./src/screens/LoginScreen";
 import ResourceListScreen from "./src/screens/ResourceListScreen";
 import AddResourceScreen from "./src/screens/AddResourceScreen";
+import SuggestionsScreen from "./src/screens/SuggestionsScreen";
 
 export type RootStackParamList = {
   Login: undefined;
   Resources: undefined;
   AddResource: undefined;
+  Suggestions: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -38,6 +40,11 @@ function RootNavigator() {
             name="AddResource"
             component={AddResourceScreen}
             options={{ title: "Add Resource" }}
+          />
+          <Stack.Screen
+            name="Suggestions"
+            component={SuggestionsScreen}
+            options={{ title: "Next Suggestions" }}
           />
         </>
       )}
