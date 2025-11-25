@@ -16,6 +16,7 @@ import * as eventbridge from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 export class InfraStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -73,6 +74,13 @@ export class InfraStack extends Stack {
 
     // DEV auth flag (lets backend read dev userId from Bearer token)
     resourcesFn.addEnvironment("DEV_AUTH", "true");
+    aiCoachFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: ["*"], // MVP; later restrict to specific model ARN
+      })
+    );
+    aiCoachFn.addEnvironment("BEDROCK_MODEL_ID", "amazon.titan-text-lite-v1");
 
     // Permissions
     resourcesTable.grantReadWriteData(resourcesFn);
@@ -112,9 +120,12 @@ export class InfraStack extends Stack {
     const stats = api.root.addResource("stats");
     stats.addMethod("GET", new apigw.LambdaIntegration(statsFn));
 
-    // /ai-coach
-    const aiCoach = api.root.addResource("ai-coach");
-    aiCoach.addMethod("POST", new apigw.LambdaIntegration(aiCoachFn));
+    // /ai
+    const ai = api.root.addResource("ai");
+
+    // /ai/suggest-next
+    const suggestNext = ai.addResource("suggest-next");
+    suggestNext.addMethod("POST", new apigw.LambdaIntegration(aiCoachFn));
 
     // --- SQS queue for stats recompute ---
     const statsQueue = new sqs.Queue(this, "StatsQueue", {

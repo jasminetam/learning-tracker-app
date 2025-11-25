@@ -80,6 +80,10 @@ export default function ResourceListScreen({ navigation }: Props) {
           title="Add Resource"
           onPress={() => navigation.navigate("AddResource")}
         />
+        <Button
+          title="AI Suggestions"
+          onPress={() => navigation.navigate("Suggestions")}
+        />
         <Button title="Sign out" onPress={signOut} />
       </View>
 
